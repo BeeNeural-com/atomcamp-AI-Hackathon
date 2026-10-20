@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+.local
+test-results
+playwright-report
+*.tsbuildinfo
+__pycache__
+.venv
+
+# backend is built separately (backend/Dockerfile); keep it out of the frontend image context
+backend
+**/.venv
+**/node_modules

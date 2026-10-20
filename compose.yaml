@@ -1,0 +1,141 @@
+# BeeProof AI - full local stack in one command:
+#
+#     docker compose up --build
+#
+#   Frontend  http://localhost:3000        (Next.js, already pointed at the API)
+#   API       http://localhost:8000/docs   (FastAPI, OpenAPI docs)
+#   Postgres  localhost:5432               (user/password/db: beeproof)
+#   Redis     localhost:6379
+#
+# Startup order is health-gated: postgres + redis -> migrate (Alembic, once) -> api -> worker + frontend.
+# Data survives restarts in named volumes; `docker compose down -v` wipes it.
+#
+# Optional GCP (Gemini / Document AI / GCS): put the variables in backend/.env
+# (EXTRACTOR=gemini, PROJECT, GEMINI_MODEL, DOCAI_PROCESSOR_ID, ...) and run
+# `gcloud auth application-default login` on the host; the credentials folder is
+# mounted read-only into the api and worker containers.
+#
+# More workers: docker compose up --build --scale worker=3
+
+name: beeproof
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://beeproof:beeproof@postgres:5432/beeproof
+  QUEUE_URL: redis://redis:6379/0
+  STORE: ${STORE:-local}
+  LOCAL_STORE_DIR: /app/data/store
+  BENCH_DIR: /app/data/bench
+  BENCH_SOURCE_CSV: /app/sample/ps06_sample_rate_sheets.csv
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  GOOGLE_APPLICATION_CREDENTIALS: /gcp/application_default_credentials.json
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_FORMAT: text
+  AUTO_CREATE_TABLES: "false"       # the migrate service owns the schema
+
+x-backend: &backend
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+    target: api
+  image: beeproof-backend:local
+  restart: unless-stopped
+  env_file:
+    - path: ./backend/.env          # optional: GCP and pipeline settings; `environment` below wins
+      required: false
+  volumes:
+    - store:/app/data
+    - ./ps06_sample_rate_sheets.csv:/app/sample/ps06_sample_rate_sheets.csv:ro
+    - ${GCLOUD_CONFIG_DIR:-${APPDATA:-${HOME}/.config}/gcloud}:/gcp:ro
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: beeproof
+      POSTGRES_PASSWORD: beeproof
+      POSTGRES_DB: beeproof
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beeproof -d beeproof"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *backend
+    command: ["python", "-m", "beeproof.migrate"]
+    environment:
+      <<: *backend-env
+    restart: "no"
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    <<: *backend
+    command: ["uvicorn", "beeproof.api.app:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers"]
+    environment:
+      <<: *backend-env
+      WORKER_MODE: "off"            # jobs run in the dedicated worker service
+    ports:
+      - "${API_PORT:-8000}:8080"
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).status == 200 else 1)"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "beeproof.worker"]
+    environment:
+      <<: *backend-env
+    depends_on:
+      api: {condition: service_healthy}
+    stop_grace_period: 30s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # baked into the browser bundle: the browser calls the API directly
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    image: beeproof-frontend:local
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+volumes:
+  pgdata:
+  redisdata:
+  store:
