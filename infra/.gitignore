@@ -1,0 +1,13 @@
+# Terraform: never commit state, plans, local caches or real variable files.
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+imports.tf
+# keep: .terraform.lock.hcl (pins provider checksums)

@@ -1,0 +1,219 @@
+# Compact production deploy (main only).
+# PR CI already gates code; this workflow builds images and rolls them out.
+# Auth: GitHub OIDC → Workload Identity Federation (no SA keys).
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_public_smoke_test:
+        description: "Skip public smoke test (before Cloudflare route exists)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: beeproof-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  REGION: ${{ vars.GCP_REGION }}
+  REPOSITORY: beeproof
+  PUBLIC_URL: https://proof.beeneural.com
+
+jobs:
+  deploy:
+    name: Build, migrate, deploy
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://proof.beeneural.com
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Check repository configuration
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          DEPLOY_SA: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+        run: |
+          missing=0
+          for v in PROJECT_ID REGION WIF_PROVIDER DEPLOY_SA; do
+            if [ -z "${!v}" ]; then echo "::error::GitHub variable for $v is not set (see docs/deployment/GITHUB_ACTIONS.md)"; missing=1; fi
+          done
+          exit $missing
+
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build and push api
+        id: api
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          target: api
+          push: true
+          provenance: false
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/beeproof-api:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push worker
+        id: worker
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          target: worker
+          push: true
+          provenance: false
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/beeproof-worker:${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=worker
+
+      - name: Build and push web
+        id: web
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          push: true
+          provenance: false
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ env.PUBLIC_URL }}/api/v1
+          tags: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/beeproof-web:${{ github.sha }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Image refs (by digest)
+        id: refs
+        env:
+          REG: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}
+        run: |
+          {
+            echo "api_image=${REG}/beeproof-api@${{ steps.api.outputs.digest }}"
+            echo "worker_image=${REG}/beeproof-worker@${{ steps.worker.outputs.digest }}"
+            echo "web_image=${REG}/beeproof-web@${{ steps.web.outputs.digest }}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify infrastructure
+        env:
+          API_IMAGE: ${{ steps.refs.outputs.api_image }}
+        run: |
+          gcloud config set project "$PROJECT_ID" --quiet
+          echo "Deploying ${GITHUB_SHA} → ${PROJECT_ID}/${REGION}"
+          for svc in beeproof-worker beeproof-api beeproof-web; do
+            gcloud run services describe "$svc" --region "$REGION" --format="value(metadata.name)" >/dev/null \
+              || { echo "::error::$svc missing — apply infra/terraform first"; exit 1; }
+          done
+          gcloud run jobs describe beeproof-migrate --region "$REGION" --format="value(metadata.name)" >/dev/null \
+            || { echo "::error::beeproof-migrate missing — apply infra/terraform first"; exit 1; }
+
+      - name: Record currently serving revisions
+        id: previous
+        run: |
+          for svc in beeproof-worker beeproof-api beeproof-web; do
+            rev=$(gcloud run services describe "$svc" --region "$REGION" --format=json \
+              | jq -r '([.status.traffic[]? | select(.percent == 100) | .revisionName // empty] | first) // .status.latestReadyRevisionName // empty')
+            key="${svc#beeproof-}"
+            echo "${key}=${rev}" >> "$GITHUB_OUTPUT"
+            echo "$svc currently serves: ${rev:-<none>}"
+          done
+
+      - name: Migrate
+        env:
+          API_IMAGE: ${{ steps.refs.outputs.api_image }}
+        run: |
+          gcloud run jobs update beeproof-migrate --region "$REGION" --image "$API_IMAGE" --quiet
+          gcloud run jobs execute beeproof-migrate --region "$REGION" --wait
+
+      - name: Deploy candidates (no traffic)
+        id: candidates
+        env:
+          API_IMAGE: ${{ steps.refs.outputs.api_image }}
+          WORKER_IMAGE: ${{ steps.refs.outputs.worker_image }}
+          WEB_IMAGE: ${{ steps.refs.outputs.web_image }}
+        run: |
+          deploy() {
+            local svc=$1 image=$2 key=$3
+            gcloud run deploy "$svc" --region "$REGION" --image "$image" --no-traffic --quiet
+            rev=$(gcloud run services describe "$svc" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            created=$(gcloud run services describe "$svc" --region "$REGION" --format="value(status.latestCreatedRevisionName)")
+            if [ "$rev" != "$created" ]; then echo "::error::$svc revision $created did not become ready"; exit 1; fi
+            echo "${key}=${rev}" >> "$GITHUB_OUTPUT"
+            echo "$svc candidate ready: $rev"
+          }
+          deploy beeproof-worker "$WORKER_IMAGE" worker
+          deploy beeproof-api "$API_IMAGE" api
+          deploy beeproof-web "$WEB_IMAGE" web
+
+      - name: Shift traffic
+        id: shift
+        env:
+          WORKER_REV: ${{ steps.candidates.outputs.worker }}
+          API_REV: ${{ steps.candidates.outputs.api }}
+          WEB_REV: ${{ steps.candidates.outputs.web }}
+        run: |
+          gcloud run services update-traffic beeproof-worker --region "$REGION" --to-revisions "${WORKER_REV}=100" --quiet
+          gcloud run services update-traffic beeproof-api --region "$REGION" --to-revisions "${API_REV}=100" --quiet
+          gcloud run services update-traffic beeproof-web --region "$REGION" --to-revisions "${WEB_REV}=100" --quiet
+
+      - name: Smoke test
+        if: ${{ !inputs.skip_public_smoke_test && vars.PUBLIC_SMOKE_TEST != 'false' }}
+        run: bash scripts/deploy/smoke-test.sh "$PUBLIC_URL" "${{ steps.candidates.outputs.api }}"
+
+      - name: Roll back traffic on failure
+        if: ${{ failure() && steps.shift.outcome != 'skipped' }}
+        env:
+          PREV_WORKER: ${{ steps.previous.outputs.worker }}
+          PREV_API: ${{ steps.previous.outputs.api }}
+          PREV_WEB: ${{ steps.previous.outputs.web }}
+        run: |
+          echo "::warning::Deploy failed after traffic shift; restoring previous revisions."
+          for pair in "beeproof-web:${PREV_WEB}" "beeproof-api:${PREV_API}" "beeproof-worker:${PREV_WORKER}"; do
+            svc=${pair%%:*}; rev=${pair#*:}
+            if [ -n "$rev" ]; then
+              gcloud run services update-traffic "$svc" --region "$REGION" --to-revisions "${rev}=100" --quiet && echo "$svc -> $rev"
+            else
+              echo "::warning::$svc had no previous revision to restore"
+            fi
+          done
+
+      - name: Summary
+        if: always()
+        env:
+          WORKER_REV: ${{ steps.candidates.outputs.worker }}
+          API_REV: ${{ steps.candidates.outputs.api }}
+          WEB_REV: ${{ steps.candidates.outputs.web }}
+          OUTCOME: ${{ job.status }}
+        run: |
+          {
+            echo "## Production deployment: ${OUTCOME}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Commit | \`${GITHUB_SHA}\` |"
+            echo "| API | \`${API_REV:-not deployed}\` |"
+            echo "| Worker | \`${WORKER_REV:-not deployed}\` |"
+            echo "| Web | \`${WEB_REV:-not deployed}\` |"
+            echo "| URL | ${PUBLIC_URL} |"
+          } >> "$GITHUB_STEP_SUMMARY"

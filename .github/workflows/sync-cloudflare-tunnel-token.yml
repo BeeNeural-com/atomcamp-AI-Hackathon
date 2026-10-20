@@ -1,0 +1,37 @@
+# Copies the CLOUDFLARE_TUNNEL_TOKEN GitHub secret into Secret Manager
+# (secret beeproof-cloudflare-tunnel-token), where the connector VMs read it at boot.
+# The deployer identity may add versions but cannot read them. The token is never printed.
+# After rotating the token, reset the connector VMs (see docs/deployment/CLOUDFLARE_TUNNEL.md).
+name: Sync Cloudflare tunnel token
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
+      - name: Add secret version
+        env:
+          TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          if [ -z "$TUNNEL_TOKEN" ]; then echo "::error::CLOUDFLARE_TUNNEL_TOKEN secret is not set"; exit 1; fi
+          printf '%s' "$TUNNEL_TOKEN" | gcloud secrets versions add beeproof-cloudflare-tunnel-token \
+            --project "$PROJECT_ID" --data-file=- --format="value(name)" >/dev/null
+          echo "Secret version added (value not shown)."

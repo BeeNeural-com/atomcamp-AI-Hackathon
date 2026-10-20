@@ -1,0 +1,35 @@
+# Optional: configure the remotely-managed tunnel's public hostname and DNS through the
+# Cloudflare API. Requires a scoped CLOUDFLARE_API_TOKEN (the tunnel token cannot do this):
+#   Account > Cloudflare Tunnel > Edit, Zone > DNS > Edit (zone beeneural.com only).
+# The same can be done once in the dashboard instead; see docs/deployment/CLOUDFLARE_TUNNEL.md.
+name: Configure Cloudflare tunnel route
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply changes (false = show current configuration only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  configure:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Configure tunnel ingress and DNS
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ vars.CLOUDFLARE_ZONE_ID }}
+          CLOUDFLARE_TUNNEL_ID: ${{ vars.CLOUDFLARE_TUNNEL_ID }}
+          TUNNEL_HOSTNAME: proof.beeneural.com
+          TUNNEL_ORIGIN: ${{ vars.TUNNEL_ORIGIN || 'http://10.10.0.10:80' }}
+          APPLY: ${{ inputs.apply }}
+        run: bash scripts/cloudflare/configure-tunnel.sh

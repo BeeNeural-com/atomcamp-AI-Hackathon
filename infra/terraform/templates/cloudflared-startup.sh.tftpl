@@ -1,0 +1,108 @@
+#!/bin/bash
+# BeeProof Cloudflare Tunnel connector bootstrap (runs as root on every boot).
+# - installs cloudflared from Cloudflare's signed apt repository
+# - reads the tunnel token from Secret Manager (never written to logs)
+# - runs cloudflared as an unprivileged, hardened systemd service with automatic restart
+# - logs a readiness check every minute (journal -> Cloud Logging via the Ops Agent)
+set -euo pipefail
+exec > >(logger -t beeproof-tunnel-bootstrap) 2>&1
+
+PROJECT_ID="${project_id}"
+SECRET_NAME="${secret_name}"
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  install -m 0755 -d /usr/share/keyrings
+  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
+  echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+    > /etc/apt/sources.list.d/cloudflared.list
+  apt-get update -qq
+  apt-get install -y -qq cloudflared
+fi
+
+if ! systemctl list-unit-files google-cloud-ops-agent.service >/dev/null 2>&1; then
+  curl -fsSL https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh -o /tmp/add-ops-agent.sh
+  bash /tmp/add-ops-agent.sh --also-install || echo "ops agent install failed; continuing"
+fi
+
+id cloudflared >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin cloudflared
+install -m 0700 -o root -g root -d /etc/cloudflared
+
+# Fetch the token (retry until an administrator has added a secret version).
+set +x
+for attempt in $(seq 1 60); do
+  if TOKEN="$(gcloud secrets versions access latest --secret="$SECRET_NAME" --project="$PROJECT_ID" 2>/dev/null)" \
+     && [ -n "$TOKEN" ]; then
+    break
+  fi
+  echo "tunnel token not available yet (attempt $attempt); retrying in 60s"
+  sleep 60
+done
+if [ -z "$${TOKEN:-}" ]; then
+  echo "no tunnel token in Secret Manager secret $SECRET_NAME; cloudflared not started"
+  exit 1
+fi
+umask 077
+printf 'TUNNEL_TOKEN=%s\n' "$TOKEN" > /etc/cloudflared/tunnel.env
+unset TOKEN
+chmod 0600 /etc/cloudflared/tunnel.env
+
+cat > /etc/systemd/system/cloudflared.service <<'UNIT'
+[Unit]
+Description=Cloudflare Tunnel connector (BeeProof)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=cloudflared
+Group=cloudflared
+EnvironmentFile=/etc/cloudflared/tunnel.env
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --metrics 127.0.0.1:20241 run
+Restart=always
+RestartSec=5
+TimeoutStartSec=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+cat > /etc/systemd/system/cloudflared-health.service <<'UNIT'
+[Unit]
+Description=Cloudflare Tunnel readiness check
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'if curl -fsS --max-time 5 http://127.0.0.1:20241/ready >/dev/null; then echo "cloudflared ready"; else echo "cloudflared NOT READY"; exit 1; fi'
+UNIT
+
+cat > /etc/systemd/system/cloudflared-health.timer <<'UNIT'
+[Unit]
+Description=Run the Cloudflare Tunnel readiness check every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now cloudflared.service cloudflared-health.timer
+systemctl restart cloudflared.service   # pick up a rotated token on reboot
+echo "cloudflared connector started"
