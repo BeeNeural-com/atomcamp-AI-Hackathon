@@ -1,6 +1,9 @@
-import urllib.request
 import json
 import time
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
 
 def test_live_pipeline():
     # 1. Fetch Schema ID
@@ -9,7 +12,7 @@ def test_live_pipeline():
     print("Using Schema ID:", schema_id)
 
     # 2. Read PDF
-    pdf_path = "backend/data/bench/pdf/metro_credit_union_rates_page1__2026-07-01.pdf"
+    pdf_path = ROOT / "backend" / "data" / "bench" / "pdf" / "metro_credit_union_rates_page1__2026-07-01.pdf"
     with open(pdf_path, 'rb') as f:
         pdf_bytes = f.read()
 

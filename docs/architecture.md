@@ -1,5 +1,7 @@
 # RateProof — Architecture & Build Spec
 
+The running repository layout is in the root [README](../README.md). This file is the build specification. The tree in §4 is the original module sketch; the implementation is `backend/beeproof/` plus the Next.js app at the repository root.
+
 > **PS-06 · Automated Data Extraction from Unstructured Documents (PDFs & Images)**
 > Agentic pipeline that turns bank rate sheets (PDF, scans, photos) into validated, audit-ready records.
 > **Tagline:** *Every number proves where it came from — and why it's right.*

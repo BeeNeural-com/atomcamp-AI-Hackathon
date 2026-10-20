@@ -1,5 +1,7 @@
 # BeeProof AI — Production deployment
 
+Product specs and the build specification are indexed in [docs/README.md](../README.md).
+
 Target: GCP project `absolute-access-415010`, region `asia-south1`.
 Public URL: **https://proof.beeneural.com**, through Cloudflare Tunnel `beeproof` (`48f78845-58d9-4aa2-9411-0a2ee7c0aa74`).
 

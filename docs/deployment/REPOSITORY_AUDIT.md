@@ -36,7 +36,7 @@ What the repository actually contains, and what that means for the production de
 
 | Topic | Finding |
 |---|---|
-| Authentication / authorization | **None, by explicit product decision** (`beeproof_ai_documentation_pack/ADR/ADR-004-open-access.md`). No organization isolation exists. Anyone who can reach the public hostname can upload, review and export. This deployment does not add auth. Cloudflare Access or WAF rules are the recommended outer controls if needed (see SECURITY.md). |
+| Authentication / authorization | **None, by explicit product decision** ([ADR-004](../product/ADR/ADR-004-open-access.md)). No organization isolation exists. Anyone who can reach the public hostname can upload, review and export. This deployment does not add auth. Cloudflare Access or WAF rules are the recommended outer controls if needed (see SECURITY.md). |
 | CORS | `CORS_ORIGINS`; production is set to `https://proof.beeneural.com` only. |
 | Rate limiting | Per-IP limit on mutating requests (Redis-backed when available, in-process otherwise). |
 | Secrets | No secrets in source. The DB URL, tunnel token and any provider credentials come from Secret Manager or ADC. |

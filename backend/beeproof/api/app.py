@@ -1,5 +1,5 @@
 """FastAPI application: /api/v1. Wire shapes follow the frontend's lib/types.ts
-(see CLAUDE_BACKEND_HANDOFF.md). Open access - no authentication (ADR-004)."""
+(see docs/handoff.md). Open access - no authentication (ADR-004)."""
 
 from __future__ import annotations
 
