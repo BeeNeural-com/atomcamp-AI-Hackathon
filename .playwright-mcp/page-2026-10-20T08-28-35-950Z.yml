@@ -1,0 +1,110 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - link "BeeProof AI home" [ref=e4] [cursor=pointer]:
+        - /url: "#overview"
+        - generic [ref=e9]: beeproofAI
+      - generic [ref=e10]:
+        - generic [ref=e11]: B
+        - generic [ref=e12]:
+          - text: Document intelligence
+          - generic [ref=e13]: BeeNeural workspace
+      - generic [ref=e16]: WORKSPACE
+      - navigation "Main navigation" [ref=e17]:
+        - link "Overview" [ref=e18] [cursor=pointer]:
+          - /url: "#overview"
+        - link "Documents" [active] [ref=e25] [cursor=pointer]:
+          - /url: "#documents"
+        - link "Review queue" [ref=e29] [cursor=pointer]:
+          - /url: "#review"
+        - link "Exports" [ref=e36] [cursor=pointer]:
+          - /url: "#exports"
+        - link "Evaluation" [ref=e40] [cursor=pointer]:
+          - /url: "#evaluation"
+      - generic [ref=e44]: CONFIGURATION
+      - navigation "Configuration" [ref=e45]:
+        - link "Extraction schema" [ref=e46] [cursor=pointer]:
+          - /url: "#schemas"
+        - link "Settings" [ref=e51] [cursor=pointer]:
+          - /url: "#settings"
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - strong [ref=e61]: Trust is in the details.
+          - paragraph [ref=e62]: Every field has a source.Every decision leaves a trail.
+          - button "Explore the workflow" [ref=e63] [cursor=pointer]
+        - button "Help & demo guide" [ref=e67] [cursor=pointer]
+        - generic [ref=e74]:
+          - text: Live API mode
+          - generic [ref=e76]: v0.1
+    - generic [ref=e77]:
+      - banner [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]: Workspace
+          - strong [ref=e83]: Documents
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - textbox "Search documents and records" [ref=e89]:
+              - /placeholder: Search documents…
+            - generic [ref=e90]: /
+          - button "Open demo guide" [ref=e92] [cursor=pointer]
+          - generic "Open access · no account required" [ref=e96]: BN
+      - main [ref=e97]:
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - strong [ref=e101]: LIVE API
+            - text: Documents and review decisions are served by your connected backend.
+          - button "Connection settings" [ref=e102] [cursor=pointer]
+        - generic [ref=e105]:
+          - generic [ref=e280]:
+            - generic [ref=e281]:
+              - generic [ref=e282]: DOCUMENT LIBRARY
+              - heading "The source of every answer." [level=1] [ref=e283]
+              - paragraph [ref=e284]: Open a document to inspect its records, evidence, and review history.
+            - generic [ref=e285]:
+              - button "Refresh" [ref=e286] [cursor=pointer]
+              - button "Upload document" [ref=e292] [cursor=pointer]
+          - generic [ref=e294]:
+            - generic [ref=e295]:
+              - generic [ref=e296]:
+                - button "All documents 1" [ref=e297] [cursor=pointer]:
+                  - text: All documents
+                  - generic [ref=e298]: "1"
+                - button "Needs review" [ref=e299] [cursor=pointer]
+                - button "Completed" [ref=e300] [cursor=pointer]
+                - button "Failed" [ref=e301] [cursor=pointer]
+              - textbox "Filter document library" [ref=e306]:
+                - /placeholder: Find a document…
+            - table [ref=e308]:
+              - rowgroup [ref=e309]:
+                - row [ref=e310]:
+                  - columnheader "Document name" [ref=e311]
+                  - columnheader "Institution" [ref=e312]
+                  - columnheader "Records" [ref=e313]
+                  - columnheader "Status" [ref=e314]
+                  - columnheader "Version" [ref=e315]
+                  - columnheader "Open" [ref=e316]
+              - rowgroup [ref=e318]:
+                - row [ref=e319]:
+                  - cell [ref=e320]:
+                    - button "PDF first_national_bank_rates_page2__2026-09-01.pdf application/pdf · 1 page" [ref=e321] [cursor=pointer]:
+                      - generic [ref=e322]: PDF
+                      - generic [ref=e327]:
+                        - strong [ref=e328]: first_national_bank_rates_page2__2026-09-01.pdf
+                        - generic [ref=e329]: application/pdf · 1 page
+                  - cell "First National Bank" [ref=e330]
+                  - cell "1" [ref=e331]
+                  - cell "Completed" [ref=e332]
+                  - cell "v1" [ref=e336]
+                  - cell [ref=e337]:
+                    - button "Open first_national_bank_rates_page2__2026-09-01.pdf" [ref=e338] [cursor=pointer]
+            - generic [ref=e342]:
+              - generic [ref=e343]: 1–1 of 1 documents
+              - generic [ref=e344]:
+                - button "Previous" [disabled] [ref=e345]
+                - button "Next" [disabled] [ref=e348]
+        - generic [ref=e273]:
+          - generic [ref=e274]:
+            - text: BEEPROOF AI
+            - generic [ref=e277]: by BeeNeural
+          - generic [ref=e278]: Built for evidence. Designed for trust.
+  - alert [ref=e279]
