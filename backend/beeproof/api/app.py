@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 import uuid
@@ -248,6 +249,7 @@ def _health() -> dict:
         "queue_ok": queue_ok,
         "worker_mode": s.worker_mode,
         "access": "open",
+        "revision": os.environ.get("K_REVISION"),
     }
 
 

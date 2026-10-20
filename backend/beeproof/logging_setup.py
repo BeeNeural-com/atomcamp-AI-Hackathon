@@ -41,7 +41,7 @@ def configure(fmt: str = "text", level: str | None = None) -> None:
         JsonFormatter() if fmt == "json" else logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
     )
     root.handlers = [handler]
-    for noisy in ("uvicorn.access",):  # Cloud Run already records request logs
+    for noisy in ("uvicorn.access", "alembic.runtime.plugins"):  # Cloud Run already records request logs
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 

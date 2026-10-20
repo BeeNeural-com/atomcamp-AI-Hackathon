@@ -1,0 +1,29 @@
+# Adopt resources that already exist instead of creating duplicates.
+# 1. Run infra/scripts/discover.sh and note which resources exist.
+# 2. Copy this file to imports.tf and keep ONLY the blocks for existing resources.
+# 3. terraform plan -var-file=environments/production.tfvars  -> must show "import", not "create"/"replace".
+# 4. After a successful apply, delete imports.tf (import blocks are one-shot).
+
+# Artifact Registry repository "beeproof" (asia-south1-docker.pkg.dev/absolute-access-415010/beeproof)
+import {
+  to = google_artifact_registry_repository.beeproof
+  id = "projects/absolute-access-415010/locations/asia-south1/repositories/beeproof"
+}
+
+# Example: an existing Cloud SQL instance
+# import {
+#   to = google_sql_database_instance.main
+#   id = "projects/absolute-access-415010/instances/beeproof-pg"
+# }
+
+# Example: an existing Cloud Tasks queue
+# import {
+#   to = google_cloud_tasks_queue.jobs
+#   id = "projects/absolute-access-415010/locations/asia-south1/queues/beeproof-jobs"
+# }
+
+# Example: existing service accounts (repeat per key: web, api, worker, migrate, tasks, connector, deployer)
+# import {
+#   to = google_service_account.sa["deployer"]
+#   id = "projects/absolute-access-415010/serviceAccounts/beeproof-github-deployer@absolute-access-415010.iam.gserviceaccount.com"
+# }

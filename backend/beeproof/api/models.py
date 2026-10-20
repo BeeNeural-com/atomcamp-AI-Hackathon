@@ -441,3 +441,4 @@ class HealthOut(BaseModel):
     queue_ok: bool
     worker_mode: str
     access: Literal["open"] = "open"
+    revision: Optional[str] = Field(None, description="Cloud Run revision serving this request (K_REVISION)")

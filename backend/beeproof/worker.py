@@ -171,6 +171,7 @@ class Worker:
         self._finish(job_id, JobStatus.FAILED, exc.code, str(exc))
 
     def _finish(self, job_id: str, status: JobStatus, code: str | None, message: str) -> None:
+        log.warning("job %s finished with status %s (%s)", job_id, status.value, code or "-")
         with session_scope() as s:
             job = get_job(s, job_id)
             transition(job, status)

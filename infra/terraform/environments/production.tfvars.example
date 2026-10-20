@@ -1,0 +1,29 @@
+# Copy to production.tfvars (git-ignored) and adjust. Contains no secrets.
+#   terraform plan -var-file=environments/production.tfvars -out=prod.tfplan
+project_id = "absolute-access-415010"
+region     = "asia-south1"
+domain     = "proof.beeneural.com"
+
+github_repository = "BeeNeural-com/atomcamp-AI-Hackathon"
+github_branch     = "main"
+
+# Exact model ID from Vertex AI Model Garden for this project/region. Empty = digital-PDF text layer only.
+gemini_model    = ""
+gemini_location = "asia-south1"
+
+# Document AI Form Parser (OCR witness for scans/photos). Create the processor first; empty = disabled.
+docai_location     = "us"
+docai_processor_id = ""
+
+# Cost / capacity
+db_tier                         = "db-g1-small"
+db_availability_type            = "ZONAL"
+connector_count                 = 1 # 2 = HA across zones
+tasks_max_concurrent_dispatches = 4
+worker_max_instances            = 10
+
+# Operations
+alert_email                = ""
+billing_account_id         = "" # XXXXXX-XXXXXX-XXXXXX to create the budget alert
+monthly_budget_amount      = 100
+enable_public_uptime_check = false # set true after the Cloudflare route is live
