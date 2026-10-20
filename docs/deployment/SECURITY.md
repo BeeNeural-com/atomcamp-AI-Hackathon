@@ -2,7 +2,7 @@
 
 ## Important: the application has no user authentication
 
-Open access is a recorded product decision (`beeproof_ai_documentation_pack/ADR/ADR-004-open-access.md`).
+Open access is a recorded product decision ([ADR-004](../product/ADR/ADR-004-open-access.md)).
 There are no accounts, roles or organization isolation. Anyone who can reach `proof.beeneural.com` can upload,
 review and export.
 

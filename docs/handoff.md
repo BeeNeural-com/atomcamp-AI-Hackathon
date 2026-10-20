@@ -4,8 +4,8 @@ The frontend is implemented in this repository. Your assignment is to build and 
 
 ## Start here
 
-1. Read this file, `lib/types.ts`, `lib/api.ts`, and `beeproof_ai_documentation_pack/`.
-2. Read root `ARCHITECTURE.md` sections 6–8 and 11–12 for extraction, independent witnesses, re-look, deterministic rate rules, and benchmark generation.
+1. Read this file, `lib/types.ts`, `lib/api.ts`, and `docs/product/`.
+2. Read `docs/architecture.md` sections 6–8 and 11–12 for extraction, independent witnesses, re-look, deterministic rate rules, and benchmark generation.
 3. Inspect Git status. The original architecture, documentation pack, and sample CSV were untracked when frontend work began; preserve them.
 4. Start with an upload → durable job → real page preview → typed extraction → validation → review → versioned export vertical slice.
 5. Keep all cloud calls behind adapters. Default development tests to fake providers. Implement a real native PDF path and real provider integrations; never pass fixture output off as model execution.

@@ -6,6 +6,8 @@ out/
 *.tsbuildinfo
 playwright-report/
 test-results/
+.playwright-mcp/
 .local/
 __pycache__/
 .venv/
+backend/data/

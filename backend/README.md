@@ -4,8 +4,8 @@ FastAPI backend for PS-06: turns bank rate sheets (PDF, scans, photos) into vali
 audit-ready records. Every value carries its source region, the readings of two
 independent witnesses, the rules it passed or failed, and its review history.
 
-- Pipeline: root [`ARCHITECTURE.md`](../ARCHITECTURE.md) §5–§12 (two witnesses, validators, bounded re-look, scoring).
-- API, data model, states: [`beeproof_ai_documentation_pack/`](../beeproof_ai_documentation_pack/) (`/api/v1`, open access per ADR-004).
+- Pipeline: [`docs/architecture.md`](../docs/architecture.md) §5–§12 (two witnesses, validators, bounded re-look, scoring).
+- API, data model, states: [`docs/product/`](../docs/product/) (`/api/v1`, open access per ADR-004).
 - Machine-readable contract: [`openapi.json`](openapi.json) (also live at `/openapi.json`, docs at `/docs`).
 
 ## Run everything with one command (Docker)
@@ -76,7 +76,7 @@ See [`.env.example`](.env.example) for all settings.
 
 ## Frontend integration guide
 
-**Wire types match the frontend's [`lib/types.ts`](../lib/types.ts)** (per `CLAUDE_BACKEND_HANDOFF.md`).
+**Wire types match the frontend's [`lib/types.ts`](../lib/types.ts)** (per [`docs/handoff.md`](../docs/handoff.md)).
 This is checked by compiling live API responses against those types with `tsc --strict`. Extra provenance
 keys (`decision`, `review_reasons`, `confidence`, `agreement`, `relook_values`, …) are additive.
 

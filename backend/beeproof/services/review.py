@@ -1,4 +1,4 @@
-"""Human review (PRODUCT_SPEC.md §6.3, CLAUDE_BACKEND_HANDOFF.md "Review").
+"""Human review (PRODUCT_SPEC.md §6.3, docs/handoff.md "Review").
 
 * Optimistic concurrency: `expected_result_version` must equal the job's current version (409).
 * A human decision never bypasses a hard rule: accepting a field that fails one, or correcting
